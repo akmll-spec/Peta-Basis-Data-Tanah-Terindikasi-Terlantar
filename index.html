@@ -1,0 +1,1926 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="initial-scale=1,user-scalable=no,maximum-scale=1,width=device-width">
+        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <link rel="stylesheet" href="css/leaflet.css">
+        <link rel="stylesheet" href="css/L.Control.Layers.Tree.css">
+        <link rel="stylesheet" href="css/qgis2web.css">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+        <link rel="stylesheet" href="css/leaflet-search.css">
+        <link rel="stylesheet" href="css/leaflet.photon.css">
+        <link rel="stylesheet" href="css/leaflet-measure.css">
+        <style>
+        html, body, #map {
+            width: 100%;
+            height: 100%;
+            padding: 0;
+            margin: 0;
+        }
+
+        /* =========================================
+           CSS MODAL TAMBAH LAYER & KONDISI KOSONG
+           ========================================= */
+        .panel-header { display: flex; justify-content: space-between; align-items: center; }
+        .btn-add-layer { background: #0fa968; color: white; border: none; width: 28px; height: 28px; border-radius: 4px; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; transition: 0.2s;}
+        .btn-add-layer:hover { background: #059669; }
+
+        .empty-state { text-align: center; color: #94a3b8; font-size: 11px; font-style: italic; padding: 20px 0; font-weight: bold; }
+
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 9999; justify-content: center; align-items: center; font-family: 'Poppins', sans-serif;}
+        .modal-content { background: white; width: 450px; max-height: 85vh; border-radius: 8px; display: flex; flex-direction: column; box-shadow: 0 10px 15px rgba(0,0,0,0.1); }
+        .modal-header { padding: 15px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
+        .modal-header h3 { margin: 0; font-size: 16px; color: #1e293b; font-weight: bold;}
+        .close-modal { cursor: pointer; font-size: 24px; color: #64748b; background: none; border: none; padding: 0; line-height: 1; }
+        .close-modal:hover { color: #ef4444; }
+        .modal-body { padding: 20px; overflow-y: auto; flex: 1; }
+        .modal-footer { padding: 15px 20px; border-top: 1px solid #e2e8f0; }
+        .btn-submit-layer { width: 100%; background: #0fa968; color: white; border: none; padding: 12px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px; letter-spacing: 0.5px;}
+        .btn-submit-layer:hover { background: #059669; }
+
+        .layer-group { margin-bottom: 18px; }
+        .layer-group-title { font-size: 11px; font-weight: bold; color: #64748b; text-transform: uppercase; margin-bottom: 10px; border-bottom: 2px solid #f1f5f9; padding-bottom: 5px; }
+        .layer-checkbox-item { display: flex; align-items: center; margin-bottom: 10px; font-size: 13px; color: #334155; cursor: pointer;}
+        .layer-checkbox-item input { margin-right: 12px; width: 16px; height: 16px; accent-color: #0fa968; cursor: pointer;}
+        /* KODE LABEL BERSIH (TANPA KOTAK) */
+        .label-dinamis-kabupaten {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            color: #000000 !important; /* Warna teks (Hitam) */
+            font-weight: bold;
+            font-family: 'Poppins', sans-serif;
+            pointer-events: none; /* Agar tidak menghalangi klik pada peta */
+        }
+        .label-dinamis-desa {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            color: #000000 !important; /* Warna teks hitam pekat */
+            font-weight: bold;
+            font-family: 'Poppins', sans-serif;
+            pointer-events: none; 
+        }
+        /* =========================================
+           CSS DASHBOARD CUSTOM 
+           ========================================= */
+        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; background-color: #f8f9fa; font-family: 'Poppins', sans-serif; }
+        .dashboard-container { display: flex; flex-direction: column; height: 100vh; }
+        
+        /* Header */
+        .header { display: flex; align-items: center; padding: 10px 20px; background: white; border-bottom: 1px solid #e2e8f0; z-index: 2000; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .header-logo { height: 45px; margin-right: 15px; }
+        .header-text h1 { margin: 0; font-size: 18px; color: #1e293b; }
+        .header-text p { margin: 0; font-size: 12px; color: #64748b; }
+
+        /* Area Tengah (Sidebar + Peta) */
+        .main-content { display: flex; flex: 1; overflow: hidden; }
+
+        /* Sidebar Kiri */
+        .sidebar-panel { width: 320px; background: #f8fafc; border-right: 1px solid #e2e8f0; display: flex; flex-direction: column; z-index: 1000; overflow-y: auto;}
+        .panel-header { padding: 20px; border-bottom: 1px solid #e2e8f0; background: white; }
+        .panel-header h2 { margin: 0; font-size: 15px; font-weight: bold; color: #0f172a; }
+        .panel-content { padding: 15px; }
+
+        /* Desain Kotak Legenda */
+        .layer-card { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+        .layer-card h3 { font-size: 11px; color: #3b82f6; margin: 0 0 5px 0; text-transform: uppercase; }
+        .layer-card h4 { font-size: 16px; margin: 0 0 10px 0; color: #0f172a; }
+        .legend-item { display: flex; align-items: center; margin-bottom: 6px; font-size: 12px; color: #475569; }
+        .legend-color { width: 16px; height: 16px; margin-right: 10px; border: 1px solid #1e293b; }
+
+        /* Kontainer Peta */
+        #map-container { flex: 1; position: relative; }
+        #map { width: 100%; height: 100%; }
+
+        /* =========================================
+           CSS SIDEBAR MINI & TAB KONTEN
+           ========================================= */
+        .sidebar-mini { width: 65px; background: white; border-right: 1px solid #e2e8f0; display: flex; flex-direction: column; align-items: center; padding-top: 15px; z-index: 1000; box-shadow: 2px 0 5px rgba(0,0,0,0.02);}
+        .sidebar-icon { margin-bottom: 15px; padding: 12px; cursor: pointer; color: #64748b; font-size: 18px; border-radius: 8px; transition: 0.2s;}
+        .sidebar-icon:hover { background: #f1f5f9; }
+        .sidebar-icon.active { background: #e6f6ec; color: #10b981; } /* Warna hijau saat aktif */
+        
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* Memaksa Tools QGIS beradaptasi di Sidebar */
+        .sidebar-panel .leaflet-control { margin: 0 !important; width: 100%; box-shadow: none !important; }
+        .sidebar-panel .leaflet-control-layers { border: 1px solid #e2e8f0; border-radius: 8px; background: white; padding: 5px; }
+        .sidebar-panel .leaflet-control-layers-expanded { padding: 0; background: transparent; border: none !important; width: 100% !important; }
+        .sidebar-panel .leaflet-control-search { float: none !important; width: 100% !important; border: 1px solid #e2e8f0; border-radius: 8px; background: white; }
+        .sidebar-panel .leaflet-control-measure { float: none !important; width: 100% !important; border: 1px solid #e2e8f0; border-radius: 8px; background: white; }
+        
+       /* =========================================
+           MODIFIKASI ALAT UKUR (MEASURE TOOL) FINAL 100%
+           ========================================= */
+        
+        /* 1. Bersihkan border dan background bawaan */
+        .sidebar-panel .leaflet-control-measure {
+            border: none !important;
+            box-shadow: none !important;
+            background: transparent !important;
+            padding: 0 !important;
+        }
+
+        /* 2. Sembunyikan judul bawaan (Measure distances and areas) */
+        .leaflet-control-measure h3 {
+            display: none !important;
+        }
+
+        /* 3. SULAP KEDUA TOMBOL MENJADI HIJAU BESAR */
+        /* Hapus !important pada display agar plugin bisa menyembunyikannya otomatis saat diklik */
+        .leaflet-control-measure .leaflet-control-measure-toggle,
+        .leaflet-control-measure .js-start {
+            display: flex; 
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 10px !important; 
+            width: 100% !important;
+            background-color: #0fa968 !important; 
+            background-image: none !important;
+            color: white !important; 
+            padding: 12px 0 !important; 
+            border-radius: 6px !important;
+            text-decoration: none !important;
+            transition: 0.2s !important;
+            font-size: 0 !important; 
+            text-indent: 0 !important; 
+        }
+
+        /* 4. KUNCI SOLUSI TOMBOL GANDA: 
+           Sembunyikan tombol toggle HANYA saat panel pengukur sedang terbuka (expanded) */
+        .leaflet-control-measure.leaflet-control-measure-expanded .leaflet-control-measure-toggle {
+            display: none !important;
+        }
+
+        .leaflet-control-measure .leaflet-control-measure-toggle:hover,
+        .leaflet-control-measure .js-start:hover {
+            background-color: #059669 !important; 
+        }
+
+        /* 5. Suntikkan Ikon di Kiri (::before) */
+        .leaflet-control-measure .leaflet-control-measure-toggle::before,
+        .leaflet-control-measure .js-start::before {
+            content: '\f545' !important; /* Ikon Penggaris Siku */
+            font-family: 'Font Awesome 6 Free' !important;
+            font-weight: 900 !important;
+            font-size: 16px !important;
+            display: block !important;
+        }
+
+        /* 6. Suntikkan Teks di Kanan (::after) */
+        .leaflet-control-measure .leaflet-control-measure-toggle::after,
+        .leaflet-control-measure .js-start::after {
+            content: 'Mulai Pengukuran Baru' !important;
+            font-family: 'Poppins', sans-serif !important; 
+            font-weight: 700 !important;
+            font-size: 14px !important; 
+            display: block !important;
+            letter-spacing: 0.5px !important;
+        }
+
+        /* 7. Menghapus ikon ungu bawaan dari leaflet-measure */
+        .leaflet-control-measure .startprompt::before {
+            display: none !important;
+        }
+
+        /* 8. Rapikan jarak saat menu ukuran terbuka */
+        .leaflet-control-measure .leaflet-control-measure-interaction {
+            padding: 0 !important;
+            margin-top: 10px !important;
+        }
+
+        /* =========================================
+           MODIFIKASI PENCARIAN (SEARCH TOOL)
+           ========================================= */
+        
+        /* 1. Bersihkan wadah bawaan */
+        .sidebar-panel .leaflet-control-search {
+            box-shadow: none !important;
+            background: transparent !important;
+            border: none !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            position: relative !important; /* KUNCI: Menjadikan wadah sebagai titik patokan */
+        }
+
+        /* 2. Desain Kolom Input Teks (Membulat & Garis Biru) */
+        /* HANYA targetkan tag input, hindari label ganda */
+        .leaflet-control-search input.search-input {
+            width: 100% !important;
+            max-width: 100% !important;
+            height: 42px !important;
+            border: 1px solid #cbd5e1 !important;
+            border-radius: 25px !important;
+            padding: 0 35px 0 38px !important; /* Ruang untuk kaca pembesar (kiri) & tombol silang (kanan) */
+            font-family: 'Poppins', sans-serif !important;
+            font-size: 13px !important;
+            color: #334155 !important;
+            outline: none !important;
+            box-sizing: border-box !important;
+            transition: all 0.2s ease !important;
+            display: block !important;
+            background: white !important;
+        }
+        
+        /* Efek fokus garis biru saat mengetik */
+        .leaflet-control-search input.search-input:focus {
+            border: 2px solid #3b82f6 !important; 
+        }
+
+        /* SEMBUNYIKAN kembaran kolom (label bawaan plugin) */
+        .leaflet-control-search label.search-input {
+            display: none !important;
+        }
+
+        /* Rapikan tombol silang (cancel) agar di dalam kolom ujung kanan */
+        .leaflet-control-search .search-cancel {
+            position: absolute !important;
+            right: 15px !important;
+            top: 10px !important;
+            font-size: 14px !important;
+            color: #94a3b8 !important;
+            text-decoration: none !important;
+        }
+        
+        .leaflet-control-search .search-cancel:hover {
+            color: #ef4444 !important; /* Berubah merah saat disorot */
+        }
+        
+        /* Efek fokus garis biru saat mengetik */
+        .leaflet-control-search .search-input:focus {
+            border: 2px solid #3b82f6 !important; 
+        }
+
+        /* 3. Posisikan Ikon Kaca Pembesar di Dalam Kolom */
+        .leaflet-control-search .search-button {
+            position: absolute !important;
+            left: 12px !important;
+            top: 11px !important;
+            width: 20px !important;
+            height: 20px !important;
+            background: none !important;
+            border: none !important;
+            color: #0f172a !important;
+            font-size: 0 !important; /* Sembunyikan teks bawaan plugin */
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            pointer-events: none !important; /* Agar klik tembus ke kolom input */
+        }
+        
+        /* Tembakkan ikon Kaca Pembesar FontAwesome */
+        .leaflet-control-search .search-button::before {
+            content: '\f002' !important; 
+            font-family: 'Font Awesome 6 Free' !important;
+            font-weight: 900 !important;
+            font-size: 16px !important;
+        }
+
+        /* 4. Dropdown Hasil Pencarian (Kotak Abu-abu) */
+        .leaflet-control-search .search-tooltip {
+            position: absolute !important; /* KUNCI: Membuatnya melayang lepas */
+            top: 48px !important; /* KUNCI: Mendorongnya ke bawah kolom (Tinggi kolom 42px + Jarak 6px) */
+            left: 0 !important;
+            z-index: 9999 !important; /* Memastikan selalu berada di atas elemen lain */
+            width: 100% !important;
+            max-width: 100% !important;
+            background: #f1f5f9 !important; 
+            border-radius: 8px !important;
+            margin-top: 0 !important;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1) !important;
+            border: 1px solid #e2e8f0 !important;
+            padding: 0 !important;
+            overflow-y: auto !important; /* Memunculkan scroll jika hasil pencarian banyak */
+            max-height: 250px !important; /* Batas tinggi maksimal dropdown */
+        }
+
+        /* 5. Daftar List Hasil Pencarian */
+        .leaflet-control-search .search-tip {
+            display: block !important;
+            padding: 12px 15px 12px 35px !important; /* Ruang untuk ikon Pin Lokasi */
+            font-family: 'Poppins', sans-serif !important;
+            font-size: 13px !important;
+            color: #0f172a !important;
+            border-bottom: 1px solid #e2e8f0 !important;
+            position: relative !important;
+            background: transparent !important;
+            margin: 0 !important;
+            border-radius: 0 !important;
+            text-align: left !important;
+            transition: 0.2s !important;
+        }
+
+        .leaflet-control-search .search-tip:last-child {
+            border-bottom: none !important;
+        }
+
+        .leaflet-control-search .search-tip:hover {
+            background-color: #e2e8f0 !important; /* Warna agak gelap saat disentuh kursor */
+        }
+
+        /* Tembakkan ikon Pin Lokasi FontAwesome */
+        .leaflet-control-search .search-tip::before {
+            content: '\f3c5' !important; 
+            font-family: 'Font Awesome 6 Free' !important;
+            font-weight: 900 !important;
+            position: absolute !important;
+            left: 12px !important;
+            color: #0f172a !important;
+            font-size: 15px !important;
+        }
+        /* =========================================
+           CSS UNTUK FITUR BUKA-TUTUP SIDEBAR
+           ========================================= */
+        .sidebar-panel.tersembunyi {
+            display: none !important;
+        }
+        
+        /* =========================================
+           CSS TOMBOL HOME & ARAH MATA ANGIN (KANAN ATAS)
+           ========================================= */
+        .leaflet-top.leaflet-right .leaflet-control {
+            margin-top: 0 !important; 
+            margin-bottom: 0 !important; 
+            box-shadow: none !important;
+            border: none !important;
+            background: transparent !important;
+        }
+        .leaflet-top.leaflet-right { margin-top: 15px !important; margin-right: 15px !important; } 
+
+        .leaflet-top.leaflet-right .leaflet-control a,
+        #btn-home,
+        #wadah-mata-angin {
+            width: 34px !important;
+            height: 34px !important;
+            background-color: #ffffff !important; 
+            color: #3b3b3b !important;
+            border: 2px solid rgba(0,0,0,0.2) !important;
+            border-radius: 4px !important;
+            box-shadow: 0 1px 5px rgba(0,0,0,0.65) !important;
+            margin-bottom: 10px !important; 
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            box-sizing: border-box !important;
+            text-decoration: none !important;
+            cursor: pointer;
+            position: relative !important;
+            clear: both !important;
+        }
+        
+        .leaflet-top.leaflet-right .leaflet-control a:hover,
+        #btn-home:hover { background-color: #f4f4f4 !important; }
+
+        #btn-home i { font-size: 16px; }
+
+        #wadah-mata-angin { padding: 3px !important; cursor: default !important; }
+        #mata-angin { width: 100%; height: 100%; pointer-events: none; display: block; margin: 0; }
+        /* =========================================
+           CSS UNTUK POP-UP BISA DITARIK (RESIZE)
+           ========================================= */
+        .leaflet-popup-content {
+            width: auto !important; 
+        }
+        </style>
+        <title>Peta Basis Data Tanah Terindikasi Terlantar</title>
+    </head>
+    <body>
+        <div class="dashboard-container">
+            <div class="header">
+                <img src="Logo_BPN-KemenATR_(2017).png" class="header-logo" alt="Logo">
+                <div class="header-text">
+                    <h1>Peta Basis Data Tanah Terindikasi Terlantar</h1>
+                    <p>Kanwil BPN Provinsi Jawa Tengah</p>
+                </div>
+            </div>
+
+           <div class="main-content">
+                
+                <div class="sidebar-mini">
+                    <div class="sidebar-icon active" id="btn-layer" onclick="bukaTab('tab-layer')" title="Daftar Layer"><i class="fas fa-layer-group"></i></div>
+                    <div class="sidebar-icon" id="btn-cari" onclick="bukaTab('tab-cari')" title="Pencarian"><i class="fas fa-search"></i></div>
+                    
+                    <!-- KELOMPOK TOMBOL UPLOAD DAN HAPUS SHP -->
+                    <div class="sidebar-icon" id="btn-upload-shp" title="Unggah Data Shapefile (.zip)">
+                        <i class="fas fa-upload"></i>
+                    </div>
+                    <input type="file" id="input-shp-zip" accept=".zip" multiple style="display: none;">
+
+                    <div class="sidebar-icon" id="btn-delete-shp" title="Bersihkan Semua SHP">
+                        <i class="fas fa-trash-alt"></i>
+                    </div>
+                </div> <!-- INI TAG PENUTUP YANG HILANG -->
+
+                <div class="sidebar-panel">
+                    <div class="panel-header">
+                        <h2 id="judul-panel">DAFTAR LAYER</h2>
+                        <button class="btn-add-layer" id="btn-add-layer" title="Tambah Layer ke Peta"><i class="fas fa-plus"></i></button>
+                    </div>
+                    <div class="panel-content">
+                        
+                        <div id="tab-layer" class="tab-content active">
+                            <!-- Tempat layer aktif akan muncul di sini -->
+                            <div id="empty-state" class="empty-state">BELUM ADA LAYER AKTIF.</div>
+                            <div id="active-layers-container"></div>
+                            
+                            <!-- ========================================== -->
+                            <!-- KOTAK KETERANGAN PATEN (LUASAN & TAHAPAN) -->
+                            <!-- ========================================== -->
+                            <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin-top: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+                                <h3 style="font-size: 11px; font-weight: bold; color: #64748b; margin: 0 0 10px 0; text-transform: uppercase; border-bottom: 2px solid #f1f5f9; padding-bottom: 5px;">INFORMASI ATRIBUT DATA</h3>
+                                
+                                <div style="font-size: 11px; color: #334155; line-height: 1.6; margin-bottom: 12px;">
+                                    <b>Keterangan Kelas Luasan:</b><br>
+                                    A1 : &lt;25 Ha<br>
+                                    A2 : 25 - 100 Ha<br>
+                                    A3 : 100 - 500 Ha<br>
+                                    A4 : 500 - 1.000 Ha<br>
+                                    A5 : 1.000 - 3.000 Ha<br>
+                                    A6 : 3.000 - 6.000 Ha<br>
+                                    A7 : 6.000 - 10.000 Ha<br>
+                                    A8 : &gt;10.000 Ha
+                                </div>
+                                
+                               <div style="font-size: 11px; color: #334155; line-height: 1.6;">
+                                    <div style="margin-bottom: 5px;"><b>Kategori Tahapan:</b></div>
+                                    
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                        <div style="display: flex; padding-right: 15px;">
+                                            <span style="white-space: nowrap; margin-right: 5px;">T0 :</span>
+                                            <span>SK Pendayagunaan TCUN</span>
+                                        </div>
+                                        <strong id="jml-t0" style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 10px; height: fit-content; min-width: 14px; text-align: center;">0</strong>
+                                    </div>
+                                    
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                        <div style="display: flex; padding-right: 15px;">
+                                            <span style="white-space: nowrap; margin-right: 5px;">T1 :</span>
+                                            <span>SK Penetapan Tanah Telantar</span>
+                                        </div>
+                                        <strong id="jml-t1" style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 10px; height: fit-content; min-width: 14px; text-align: center;">0</strong>
+                                    </div>
+                                    
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                        <div style="display: flex; padding-right: 15px;">
+                                            <span style="white-space: nowrap; margin-right: 5px;">T2 :</span>
+                                            <span>Dihapus/Optimalisasi Penggunaan</span>
+                                        </div>
+                                        <strong id="jml-t2" style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 10px; height: fit-content; min-width: 14px; text-align: center;">0</strong>
+                                    </div>
+                                    
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                        <div style="display: flex; padding-right: 15px;">
+                                            <span style="white-space: nowrap; margin-right: 5px;">T3 :</span>
+                                            <span>Usulan Penetapan Tante (Status Quo)</span>
+                                        </div>
+                                        <strong id="jml-t3" style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 10px; height: fit-content; min-width: 14px; text-align: center;">0</strong>
+                                    </div>
+                                    
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                        <div style="display: flex; padding-right: 15px;">
+                                            <span style="white-space: nowrap; margin-right: 5px;">T4 :</span>
+                                            <span>Proses Penetapan</span>
+                                        </div>
+                                        <strong id="jml-t4" style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 10px; height: fit-content; min-width: 14px; text-align: center;">0</strong>
+                                    </div>
+                                    
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                        <div style="display: flex; padding-right: 15px;">
+                                            <span style="white-space: nowrap; margin-right: 5px;">T5 :</span>
+                                            <span>Belum Penertiban (Belum Berakhir Hak)</span>
+                                        </div>
+                                        <strong id="jml-t5" style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 10px; height: fit-content; min-width: 14px; text-align: center;">0</strong>
+                                    </div>
+                                    
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                        <div style="display: flex; padding-right: 15px;">
+                                            <span style="white-space: nowrap; margin-right: 5px;">T6 :</span>
+                                            <span>Belum Penertiban (Sudah Berakhir Hak)</span>
+                                        </div>
+                                        <strong id="jml-t6" style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 10px; height: fit-content; min-width: 14px; text-align: center;">0</strong>
+                                    </div>
+                                    
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                        <div style="display: flex; padding-right: 15px;">
+                                            <span style="white-space: nowrap; margin-right: 5px;">T7 :</span>
+                                            <span>Proses Penertiban (Sudah Berakhir Hak)</span>
+                                        </div>
+                                        <strong id="jml-t7" style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 10px; height: fit-content; min-width: 14px; text-align: center;">0</strong>
+                                    </div>
+                                    
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px; padding-top: 8px; border-top: 1px dashed #cbd5e1; color: #0fa968;">
+                                        <b>TOTAL KESELURUHAN DATA:</b> <strong id="jml-total" style="font-size: 12px;">0</strong>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- ========================================== -->
+
+                            <!-- Menyembunyikan menu bawaan QGIS agar bersih -->
+                            <div id="tempat-layer-qgis" style="display: none;"></div>
+                        </div>
+                        <div id="tab-basemap" class="tab-content">
+                            <p style="font-size: 11px; color: #64748b; margin-top:0; margin-bottom:15px;">Pilih latar belakang peta yang ingin digunakan:</p>
+                            
+                            <div class="basemap-card active" id="card-osm" onclick="gantiBasemap('osm')">
+                                <span style="font-weight: bold;">OpenStreetMap (Default)</span>
+                                <i class="fas fa-check check-icon"></i>
+                            </div>
+                            
+                            <div class="basemap-card" id="card-satelit" onclick="gantiBasemap('satelit')">
+                                <span style="font-weight: bold;">Google Satellite</span>
+                                <i class="fas fa-check check-icon" style="display:none;"></i>
+                            </div>
+                            
+                            <div class="basemap-card" id="card-terrain" onclick="gantiBasemap('terrain')">
+                                <span style="font-weight: bold;">Google Terrain</span>
+                                <i class="fas fa-check check-icon" style="display:none;"></i>
+                            </div>
+                        </div>
+
+                        <div id="tab-cari" class="tab-content">
+                            <p style="font-size: 11px; color: #64748b; margin-top:0; margin-bottom:15px;">Contoh: "Semarang" atau "Brebes"</p>
+                            <div id="tempat-cari"></div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <div id="map-container">
+                    <div id="map">
+                        <!-- TOMBOL HOME & MATA ANGIN -->
+                        <div id="btn-home" title="Kembali ke Tampilan Jawa Tengah"><i class="fas fa-home"></i></div>
+                        
+                        <div id="wadah-mata-angin" title="Arah Utara">
+                            <svg id="mata-angin" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+                                <text x="50" y="32" font-family="'Poppins', sans-serif" font-size="26" font-weight="bold" fill="#3b3b3b" text-anchor="middle">N</text>
+                                <g stroke="#3b3b3b" stroke-width="4" stroke-linejoin="round" stroke-linecap="round">
+                                    <polygon points="50,42 30,85 50,72" fill="#ffffff" />
+                                    <polygon points="50,42 70,85 50,72" fill="#3b3b3b" />
+                                </g>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+           <!-- STRUKTUR MODAL POP-UP TAMBAH LAYER -->
+        <div class="modal-overlay" id="layer-modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Tambah Layer ke Peta</h3>
+                    <button class="close-modal" id="btn-close-modal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="layer-group">
+                        <div class="layer-group-title">Batas Administrasi & Kategori</div>
+                        <label class="layer-checkbox-item">
+                            <input type="checkbox" id="chk-wilayah" checked> Wilayah Administrasi Kabupaten/Kota
+                        </label>
+                        <!-- TAMBAHAN BARU: Menu Centang Desa -->
+                        <label class="layer-checkbox-item">
+                            <input type="checkbox" id="chk-desa" checked> wilayah Administrasi Desa/Kelurahan
+                        </label>
+                    </div>
+
+                    <div class="layer-group">
+                        <div class="layer-group-title">Peta Latar (Basemap)</div>
+                        <label class="layer-checkbox-item">
+                            <input type="checkbox" id="chk-osm" checked> OSM Standard
+                        </label>
+                        <label class="layer-checkbox-item">
+                            <input type="checkbox" id="chk-satelit"> Google Satellite
+                        </label>
+                        <label class="layer-checkbox-item">
+                            <input type="checkbox" id="chk-terrain"> Google Terrain
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-submit-layer" id="btn-apply-layers">TAMBAH LAYER KE PETA</button>
+                </div>
+            </div>
+        </div>   
+        <script src="js/qgis2web_expressions.js"></script>
+        <script src="js/leaflet.js"></script>
+        <script src="js/L.Control.Layers.Tree.min.js"></script>
+        <script src="js/leaflet.rotatedMarker.js"></script>
+        <script src="js/leaflet.pattern.js"></script>
+        <script src="js/leaflet-hash.js"></script>
+        <script src="js/Autolinker.min.js"></script>
+        <script src="js/rbush.min.js"></script>
+        <script src="js/labelgun.min.js"></script>
+        <script src="js/labels.js"></script>
+        <script src="js/leaflet.photon.js"></script>
+        <script src="js/leaflet-measure.js"></script>
+        <script src="js/leaflet-search.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+        <script src="https://unpkg.com/shpjs@latest/dist/shp.js"></script>
+        <script>
+var dataSheets = [];
+var linkCSV = "https://docs.google.com/spreadsheets/d/1vMMa1MYxlTGbOl1wvp4pqaNMwYAY2fIjDk3zmevsl1I/gviz/tq?tqx=out:csv&gid=0";
+
+function perbaruiDataDariSheets() {
+            var urlAntiCache = linkCSV + "&waktu_acak=" + new Date().getTime();
+
+            fetch(urlAntiCache)
+            .then(function(response) { return response.text(); })
+            .then(function(csvText) {
+                Papa.parse(csvText, {
+                    header: false, 
+                    skipEmptyLines: true,
+                    complete: function(results) {
+                        var barisMentah = results.data;
+                        
+                        if (barisMentah.length < 3) {
+                            console.error("Data terlalu pendek.");
+                            return;
+                        }
+
+                        // =======================================================
+                        // 1. KAMUS PEMBERSIH HEADER
+                        // =======================================================
+                        var kamusHeader = [
+                            { kunci: "kelasluasan", teksBersih: "Kelas Luasan Hak Atas Tanah" },
+                            { kunci: "kategoritahapan", teksBersih: "Kategori Tahapan" },
+                            { kunci: "statusskpenetapan", teksBersih: "Status SK Penetapan Tanah Telantar" },
+                            { kunci: "quotidaklayak", teksBersih: "Tindak Lanjut Status Quo Tidak Layak" }, 
+                            { kunci: "usulanpenetapan", teksBersih: "Tindak Lanjut Usulan Penetapan Tanah Telantar/Status Quo" } 
+                        ];
+
+                        var finalHeaders = [];
+                        var headerTerpakai = {};
+                        
+                        var batasBarisHeader = Math.min(3, barisMentah.length);
+                        var jumlahKolom = 0;
+                        for(var i = 0; i < batasBarisHeader; i++) {
+                            if(barisMentah[i].length > jumlahKolom) jumlahKolom = barisMentah[i].length;
+                        }
+
+                        // =======================================================
+                        // 2. MESIN PENCARI HEADER PINTAR
+                        // =======================================================
+                        for (var c = 0; c < jumlahKolom; c++) {
+                            var judulDitemukan = "";
+
+                            for (var r = 0; r < batasBarisHeader; r++) {
+                                var nilaiSelAsli = (barisMentah[r] && barisMentah[r][c] !== undefined) ? String(barisMentah[r][c]).trim() : "";
+                                
+                                if (nilaiSelAsli === "") continue; 
+                                if (/^\d+$/.test(nilaiSelAsli)) continue; 
+                                
+                                var nilaiPembersih = nilaiSelAsli.toLowerCase().replace(/[\s\r\n]+/g, '');
+                                var cocokKamus = false;
+
+                                for(var k = 0; k < kamusHeader.length; k++) {
+                                    if (nilaiPembersih.includes(kamusHeader[k].kunci)) {
+                                        judulDitemukan = kamusHeader[k].teksBersih; 
+                                        cocokKamus = true;
+                                        break;
+                                    }
+                                }
+
+                                if (cocokKamus) break; 
+
+                                if (judulDitemukan === "") {
+                                    judulDitemukan = nilaiSelAsli;
+                                    break; 
+                                }
+                            }
+
+                            if (judulDitemukan === "") { 
+                                judulDitemukan = "Kolom_" + (c + 1); 
+                            }
+
+                            if (headerTerpakai[judulDitemukan]) {
+                                var hitung = 1;
+                                while (headerTerpakai[judulDitemukan + "_" + hitung]) { hitung++; }
+                                judulDitemukan = judulDitemukan + "_" + hitung;
+                            }
+                            headerTerpakai[judulDitemukan] = true;
+                            finalHeaders.push(judulDitemukan);
+                        }
+
+                        // =======================================================
+                        // 3. GABUNGKAN DATA (KEMBALI KE r = 1)
+                        // Kunci Perbaikan: Membaca dari baris awal agar tidak ada
+                        // data yang tergeser/terlompati oleh sistem.
+                        // =======================================================
+                        var dataObjects = [];
+                        for (var r = 1; r < barisMentah.length; r++) { 
+                            var rowArray = barisMentah[r];
+                            if (rowArray.length <= 1) continue; 
+
+                            var obj = {};
+                            for (var c = 0; c < finalHeaders.length; c++) {
+                                obj[finalHeaders[c]] = rowArray[c] !== undefined ? String(rowArray[c]).trim() : "";
+                            }
+                            dataObjects.push(obj);
+                        }
+
+                        // =======================================================
+                        // 4. FILTER CERDAS ANTI-GHOSTING
+                        // =======================================================
+                        var dataBersih = dataObjects.filter(function(row) {
+                            var nilaiArray = Object.values(row);
+                            var kolomPertama = nilaiArray[0] ? String(nilaiArray[0]).trim().toLowerCase() : "";
+                            var kolomKedua = nilaiArray[1] ? String(nilaiArray[1]).trim().toLowerCase() : "";
+                            
+                            // A. Buang jika datanya kosong melompong
+                            if (kolomPertama === "" && kolomKedua === "") return false; 
+
+                            // B. Buang jika ini adalah baris khusus angka (seperti angka 1, 2, 3 di bawah header)
+                            if (/^\d+$/.test(kolomPertama)) return false;
+
+                            // C. Buang jika ini adalah baris header yang terbawa ke bawah
+                            if (kolomPertama.includes("wilayah") && kolomPertama.includes("administrasi")) return false;
+
+                            // Sisanya (termasuk Banjarnegara), biarkan masuk dengan selamat!
+                            return true; 
+                        });
+
+                        dataSheets = dataBersih;
+                        window.dataSheetsGlobal = dataBersih;
+                        console.log("SUKSES SINKRONISASI! Total data masuk: " + dataBersih.length);
+                        // EKSEKUSI HITUNGAN TAHAPAN SAAT DATA BERHASIL DISINKRONISASI
+                        hitungDanTampilkanTahapan(dataBersih);
+                        // TAMBAHKAN INI: Tampilkan Batas Desa yang cocok
+                        tampilkanDesaTerlantarSaja(dataBersih);
+                    }
+                });
+            })
+            .catch(function(err) {
+                console.error("Gagal menarik data:", err);
+            });
+        }
+
+        // =======================================================
+        // FUNGSI HITUNG REKAPITULASI TAHAPAN (T0 - T7)
+        // =======================================================
+        function hitungDanTampilkanTahapan(dataMentah) {
+            var rekap = { 'T0': 0, 'T1': 0, 'T2': 0, 'T3': 0, 'T4': 0, 'T5': 0, 'T6': 0, 'T7': 0 };
+            var totalSeluruh = 0;
+
+            dataMentah.forEach(function(baris) {
+                var nilaiTahapan = baris['Kategori Tahapan'];
+                
+                if (nilaiTahapan) {
+                    // Bersihkan dari spasi berlebih dan ubah ke huruf kapital
+                    var teksBersih = String(nilaiTahapan).trim().toUpperCase();
+                    
+                    // (Pengaman) Jika ada yang salah ketik huruf 'O' bukannya angka '0' di excel
+                    if (teksBersih === 'TO') { teksBersih = 'T0'; }
+
+                    // Jika kode cocok dengan T0 sampai T7, tambahkan angkanya
+                    if (rekap[teksBersih] !== undefined) {
+                        rekap[teksBersih]++;
+                        totalSeluruh++;
+                    }
+                }
+            });
+
+            // Tembakkan hasil perhitungan langsung ke dalam tampilan Sidebar
+            for (var kunci in rekap) {
+                var elemenAngka = document.getElementById('jml-' + kunci.toLowerCase());
+                if (elemenAngka) {
+                    elemenAngka.innerText = rekap[kunci];
+                }
+            }
+            
+            // Tembakkan hasil Total Keseluruhan
+            var elemenTotal = document.getElementById('jml-total');
+            if (elemenTotal) {
+                elemenTotal.innerText = totalSeluruh;
+            }
+        }
+// =======================================================
+        // FUNGSI PENYARINGAN SPASIAL + POP-UP DESA SPESIFIK
+        // =======================================================
+        function tampilkanDesaTerlantarSaja(dataSpreadsheet) {
+            var daftarDesaLengkap = [];
+            
+            // 1. Ekstrak data Excel dan cukur habis spasi "gaib"
+            dataSpreadsheet.forEach(function(baris) {
+                var desa = baris["Desa/Kelurahan"];
+                var kab = baris["Kabupaten/Kota"];
+                var kec = baris["Kecamatan"];
+                
+                if (desa && String(desa).trim().toLowerCase() !== "desa/kelurahan") {
+                    var desaBersih = String(desa).toLowerCase().trim();
+                    var kabBersih = kab ? String(kab).toLowerCase().replace(/kabupaten /g, "").replace(/kota /g, "").trim() : "";
+                    var kecBersih = kec ? String(kec).toLowerCase().replace(/kecamatan /g, "").trim() : "";
+                    
+                    daftarDesaLengkap.push({ desa: desaBersih, kab: kabBersih, kec: kecBersih });
+                }
+            });
+
+            // 2. KOSONGKAN WADAH GRUP (Supaya tidak menumpuk saat reload)
+            grupLayerDesa.clearLayers();
+
+            // 3. Pastikan elevator elevasi tetap ada (Lantai 404)
+            if (!map.getPane('pane_desa_terlantar')) {
+                map.createPane('pane_desa_terlantar');
+                map.getPane('pane_desa_terlantar').style.zIndex = 404; 
+                map.getPane('pane_desa_terlantar').style['mix-blend-mode'] = 'normal';
+            }
+
+            // 4. Proses Eksekusi Peta
+            if (typeof json_Batas_Desa !== 'undefined') {
+                var layerBaru = L.geoJSON(json_Batas_Desa, {
+                    pane: 'pane_desa_terlantar', 
+                    
+                    // --- BAGIAN A: MENYARING DESA (Hanya tampilkan yang ada di Excel) ---
+                    filter: function(feature) {
+                        var props = feature.properties;
+                        var kunciKolom = Object.keys(props);
+                        var namaKolDesa = kunciKolom.find(function(k) { return k.toLowerCase() === 'namobj'; });
+                        var namaKolKab = kunciKolom.find(function(k) { return k.toLowerCase() === 'wadmkk'; });
+                        var namaKolKec = kunciKolom.find(function(k) { return k.toLowerCase() === 'wadmkc'; });
+                        
+                        var desaPeta = namaKolDesa ? props[namaKolDesa] : "";
+                        var kabPeta = namaKolKab ? props[namaKolKab] : "";
+                        var kecPeta = namaKolKec ? props[namaKolKec] : "";
+                        
+                        if (!desaPeta) return false;
+
+                        var desaPetaBersih = String(desaPeta).toLowerCase().trim();
+                        var kabPetaBersih = String(kabPeta).toLowerCase().replace(/kabupaten /g, "").replace(/kota /g, "").trim();
+                        var kecPetaBersih = String(kecPeta).toLowerCase().replace(/kecamatan /g, "").trim();
+                        
+                        for (var i = 0; i < daftarDesaLengkap.length; i++) {
+                            var dataEx = daftarDesaLengkap[i];
+                            if (desaPetaBersih === dataEx.desa) {
+                                if (kabPetaBersih !== "" && dataEx.kab !== "") {
+                                    if (kabPetaBersih === dataEx.kab) return true;
+                                } else if (kecPetaBersih !== "" && dataEx.kec !== "") {
+                                    if (kecPetaBersih === dataEx.kec) return true;
+                                } else {
+                                    return true;
+                                }
+                            }
+                        }
+                        return false; 
+                    },
+                    
+                    // --- BAGIAN B: MEWARNAI DESA ---
+                    style: function(feature) {
+                        return { color: "#ef4444", weight: 2, fillColor: "#ef4444", fillOpacity: 0.8 };
+                    },
+                    
+                    // --- BAGIAN C: MEMBUAT POP-UP SPESIFIK SAAT DIKLIK ---
+                    onEachFeature: function(feature, layer) {
+                        
+                        // KODE BARU: MENGAMBIL NAMA DESA & MEMASANG LABEL
+                        var propertiDesa = feature.properties;
+                        var kunciKolomDesa = Object.keys(propertiDesa);
+                        var namaKolDesa = kunciKolomDesa.find(function(k) { return k.toLowerCase() === 'namobj'; });
+                        var teksNamaDesa = namaKolDesa ? propertiDesa[namaKolDesa] : "";
+                        
+                        if (teksNamaDesa) {
+                            layer.bindTooltip(String(teksNamaDesa), {
+                                permanent: true, 
+                                direction: 'center', 
+                                className: 'label-dinamis-desa'
+                            });
+                        }
+                        layer.bindPopup(function(layer) {
+                            var props = feature.properties;
+                            var kunciKolom = Object.keys(props);
+                            var namaKolDesa = kunciKolom.find(function(k) { return k.toLowerCase() === 'namobj'; });
+                            var namaKolKab = kunciKolom.find(function(k) { return k.toLowerCase() === 'wadmkk'; });
+                            var namaKolKec = kunciKolom.find(function(k) { return k.toLowerCase() === 'wadmkc'; });
+                            
+                            var desaPeta = namaKolDesa ? props[namaKolDesa] : "";
+                            var kabPeta = namaKolKab ? props[namaKolKab] : "";
+                            var kecPeta = namaKolKec ? props[namaKolKec] : "";
+                            
+                            var desaPetaBersih = String(desaPeta).toLowerCase().trim();
+                            var kabPetaBersih = String(kabPeta).toLowerCase().replace(/kabupaten /g, "").replace(/kota /g, "").trim();
+                            var kecPetaBersih = String(kecPeta).toLowerCase().replace(/kecamatan /g, "").trim();
+
+                            // TARIK HANYA DATA EXCEL YANG COCOK DENGAN DESA YANG SEDANG DIKLIK
+                            var dataSpesifikDesaIni = dataSpreadsheet.filter(function(baris) {
+                                var desaEx = baris["Desa/Kelurahan"] ? String(baris["Desa/Kelurahan"]).toLowerCase().trim() : "";
+                                var kabEx = baris["Kabupaten/Kota"] ? String(baris["Kabupaten/Kota"]).toLowerCase().replace(/kabupaten /g, "").replace(/kota /g, "").trim() : "";
+                                var kecEx = baris["Kecamatan"] ? String(baris["Kecamatan"]).toLowerCase().replace(/kecamatan /g, "").trim() : "";
+                                
+                                if (desaPetaBersih === desaEx) {
+                                    if (kabPetaBersih !== "" && kabEx !== "") return kabPetaBersih === kabEx;
+                                    if (kecPetaBersih !== "" && kecEx !== "") return kecPetaBersih === kecEx;
+                                    return true;
+                                }
+                                return false;
+                            });
+
+                            // RAKIT DESAIN POP-UP HTML-NYA
+                            var JudulDesa = desaPeta ? String(desaPeta) : "Desa Terindikasi";
+                            var htmlPopUp = '<div style="height: 250px; width: 310px; min-width: 250px; min-height: 150px; max-width: 800px; max-height: 70vh; resize: both; overflow: auto; padding-right: 5px; font-family: \'Poppins\', sans-serif;">';
+                            htmlPopUp += '<h3 style="margin-top:0; margin-bottom:5px; color:#2c3e50; border-bottom: 2px solid #ef4444; padding-bottom: 5px;">Desa ' + JudulDesa + '</h3>';
+
+                            if(dataSpesifikDesaIni.length > 0) {
+                                htmlPopUp += '<p style="font-size:11px; color:#64748b; margin-bottom:10px;">Ditemukan <b>' + dataSpesifikDesaIni.length + '</b> data. Klik pada nama untuk detail:</p>';
+
+                                dataSpesifikDesaIni.forEach(function(baris, index) {
+                                    htmlPopUp += '<details style="margin-bottom: 6px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 5px;">';
+                                    
+                                    var judulLipatan = baris['Nama Pemegang Hak'] || baris[Object.keys(baris)[2]] || ('Data ke-' + (index + 1));
+                                    htmlPopUp += '<summary style="padding: 8px; font-size: 12px; font-weight: bold; color: #0f172a; cursor: pointer; outline: none;">';
+                                    htmlPopUp += (index + 1) + '. ' + judulLipatan;
+                                    htmlPopUp += '</summary>';
+                                    
+                                    htmlPopUp += '<div style="padding: 10px; border-top: 1px solid #cbd5e1; background: #ffffff;">';
+                                    htmlPopUp += '<table style="width: 100%; font-size: 11px; border-collapse: collapse; text-align: left;">';
+                                    
+                                    var namaKolomPertama = Object.keys(baris)[0];
+                                    for (var namaKolom in baris) {
+                                        if (namaKolom !== namaKolomPertama && namaKolom.trim() !== "") {
+                                            var nilaiData = baris[namaKolom];
+                                            if (nilaiData === "" || nilaiData === null || typeof nilaiData === "undefined") nilaiData = "-";
+                                            var isiTeks = String(nilaiData).replace(/\n/g, '<br>');
+
+                                            htmlPopUp += '<tr>';
+                                            htmlPopUp += '<td style="padding: 4px 0; border-bottom: 1px solid #f1f5f9; width: 40%; vertical-align: top;"><b>' + namaKolom + '</b></td>';
+                                            htmlPopUp += '<td style="padding: 4px 0; border-bottom: 1px solid #f1f5f9; vertical-align: top;">' + isiTeks + '</td>';
+                                            htmlPopUp += '</tr>';
+                                        }
+                                    }
+                                    htmlPopUp += '</table></div></details>';
+                                });
+                            } else {
+                                htmlPopUp += '<p style="color: #ef4444; font-size: 12px; margin-top:10px;">Data detail tidak ditemukan.</p>';
+                            }
+                            htmlPopUp += '</div>';
+
+                            return htmlPopUp;
+                        }, { maxWidth: 850, minWidth: 250, closeOnClick: false });
+                    }
+                });
+                
+                // 5. MASUKKAN HASIL KODE KE DALAM GRUP WADAH LAYER PANEL
+                grupLayerDesa.addLayer(layerBaru);
+            }
+        }
+        // 2. Jalankan fungsi satu kali secara langsung saat web pertama kali dibuka
+        perbaruiDataDariSheets();
+
+        // 3. Pasang Timer Otomatis (Setiap 15 Detik)
+        // Angka 15000 adalah hitungan milidetik (15.000 ms = 15 detik).
+        // Silakan ubah angka ini jika Anda ingin waktu tunggu yang lebih cepat atau lebih lambat.
+        setInterval(perbaruiDataDariSheets, 60000);
+        </script>
+        <script src="data/Wilayahadministrasikabupatenkota_3.js"></script>
+        <!-- TAMBAHKAN BARIS INI: Memanggil data Batas Desa -->
+        <script src="data/Batas_Desa.js"></script>
+        <script>
+        var map = L.map('map', {
+            zoomControl: false, 
+            maxZoom: 28, 
+            minZoom: 1,
+            // RUMUS ANTI-BLANK: Memperlebar area render di balik layar
+            // Semakin besar angka padding (standarnya 0.1), semakin anti-terpotong
+            renderer: L.svg({ padding: 2 }) 
+        }).fitBounds([[-8.48349739740613,108.07859867895174],[-5.872741136706118,111.74958179993602]]);
+        var hash = new L.Hash(map);
+        map.attributionControl.setPrefix('<b style="color: #1e293b;">Sumber Data: Basisdata Kanwil BPN Provinsi Jawa Tengah</b>');
+        var autolinker = new Autolinker({truncate: {length: 30, location: 'smart'}});
+        // remove popup's row if "visible-with-data"
+        function removeEmptyRowsFromPopupContent(content, feature) {
+         var tempDiv = document.createElement('div');
+         tempDiv.innerHTML = content;
+         var rows = tempDiv.querySelectorAll('tr');
+         for (var i = 0; i < rows.length; i++) {
+             var td = rows[i].querySelector('td.visible-with-data');
+             var key = td ? td.id : '';
+             if (td && td.classList.contains('visible-with-data') && feature.properties[key] == null) {
+                 rows[i].parentNode.removeChild(rows[i]);
+             }
+         }
+         return tempDiv.innerHTML;
+        }
+        // modify popup if contains media
+        function addClassToPopupIfMedia(content, popup) {
+            var tempDiv = document.createElement('div');
+            tempDiv.innerHTML = content;
+            var imgTd = tempDiv.querySelector('td img');
+            if (imgTd) {
+                var src = imgTd.getAttribute('src');
+                if (/\.(jpg|jpeg|png|gif|bmp|webp|avif)$/i.test(src)) {
+                    popup._contentNode.classList.add('media');
+                    var img = popup._contentNode.querySelector('td img');
+                    if (img) {
+                        // If already loaded (cache), update immediately
+                        if (img.complete && img.naturalHeight > 0) {
+                            popup.update();
+                        } else {
+                            img.addEventListener('load', function() {
+                                popup.update();
+                            });
+                            img.addEventListener('error', function() {
+                                popup.update();
+                            });
+                        }
+                    }
+                } else if (/\.(mp3|wav|ogg|aac)$/i.test(src)) {
+                    var audio = document.createElement('audio');
+                    audio.controls = true;
+                    audio.src = src;
+                    imgTd.parentNode.replaceChild(audio, imgTd);
+                    popup._contentNode.classList.add('media');
+                    setTimeout(function() {
+                        popup.setContent(tempDiv.innerHTML);
+                        popup.update();
+                    }, 10);
+                } else if (/\.(mp4|webm|ogg|mov)$/i.test(src)) {
+                    var video = document.createElement('video');
+                    video.controls = true;
+                    video.src = src;
+                    video.style.width = "400px";
+                    video.style.height = "300px";
+                    video.style.maxHeight = "60vh";
+                    video.style.maxWidth = "60vw";
+                    imgTd.parentNode.replaceChild(video, imgTd);
+                    popup._contentNode.classList.add('media');
+                
+                    video.addEventListener('loadedmetadata', function() {
+                        popup.update();
+                    });
+                    setTimeout(function() {
+                        popup.setContent(tempDiv.innerHTML);
+                        popup.update();
+                    }, 10);
+                } else {
+                    popup._contentNode.classList.remove('media');
+                }
+            } else {
+                popup._contentNode.classList.remove('media');
+            }
+        }
+        var zoomControl = L.control.zoom({
+            position: 'topright'
+        }).addTo(map);
+        var bounds_group = new L.featureGroup([]);
+        function setBounds() {
+        }
+        map.createPane('pane_GoogleTerrain_0');
+        map.getPane('pane_GoogleTerrain_0').style.zIndex = 400;
+        var layer_GoogleTerrain_0 = L.tileLayer('https://mt1.google.com/vt/lyrs=p&x={x}&y={y}&z={z}', {
+            pane: 'pane_GoogleTerrain_0',
+            opacity: 1.0,
+            attribution: '',
+            minZoom: 1,
+            maxZoom: 28,
+            minNativeZoom: 0,
+            maxNativeZoom: 20
+        });
+        layer_GoogleTerrain_0;
+        map.addLayer(layer_GoogleTerrain_0);
+        map.createPane('pane_GoogleSatellite_1');
+        map.getPane('pane_GoogleSatellite_1').style.zIndex = 401;
+        var layer_GoogleSatellite_1 = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+            pane: 'pane_GoogleSatellite_1',
+            opacity: 1.0,
+            attribution: '',
+            minZoom: 1,
+            maxZoom: 28,
+            minNativeZoom: 0,
+            maxNativeZoom: 20
+        });
+        layer_GoogleSatellite_1;
+        map.addLayer(layer_GoogleSatellite_1);
+        map.createPane('pane_OSMStandard_2');
+        map.getPane('pane_OSMStandard_2').style.zIndex = 402;
+        var layer_OSMStandard_2 = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            pane: 'pane_OSMStandard_2',
+            opacity: 1.0,
+            attribution: '',
+            minZoom: 1,
+            maxZoom: 28,
+            minNativeZoom: 0,
+            maxNativeZoom: 19
+        });
+        layer_OSMStandard_2;
+        map.addLayer(layer_OSMStandard_2);
+        function pop_Wilayahadministrasikabupatenkota_3(feature, layer) {
+            
+           // ==========================================
+            // 1. BAGIAN LABEL (Dengan Koreksi Posisi)
+            // ==========================================
+            var namaLabel = feature.properties['Wilayah ad'];
+            if (namaLabel) {
+                // A. Ambil koordinat titik tengah bawaan komputer
+                var titikTengah = layer.getBounds().getCenter();
+
+                // B. KOREKSI MANUAL KOORDINAT (Khusus wilayah bandel)-7.271883107857185, 110.06146309666707
+                // Format: L.latLng(Garis Lintang, Garis Bujur)
+                if (namaLabel === 'Jepara') {
+                    titikTengah = L.latLng(-6.650, 110.750); // Tarik paksa ke daratan Jepara
+                } else if (namaLabel === 'Cilacap') {
+                    titikTengah = L.latLng(-7.623607707727941, 108.93148686345201); // ➔ Sudah digeser menjauhi Banyumas
+                } else if (namaLabel === 'Brebes') {
+                    titikTengah = L.latLng(-7.005560402212599, 108.87516592070435); // Tarik ke tengah daratan Brebes
+                } else if (namaLabel === 'Kebumen') {
+                    titikTengah = L.latLng(-7.66840846100683, 109.61136789590634); // Tarik ke tengah daratan Kebumen
+                } else if (namaLabel === 'Magelang') {
+                    titikTengah = L.latLng(-7.565269016367422, 110.23102009208583); // Tarik ke tengah daratan Kebumen
+                } else if (namaLabel === 'Semarang') {
+                    titikTengah = L.latLng(-7.240083090039943, 110.44079914242863); // Tarik ke tengah daratan Kebumen
+                } else if (namaLabel === 'Boyolali') {
+                    titikTengah = L.latLng(-7.404765419490504, 110.70069238104116); // Tarik ke tengah daratan Kebumen
+                } else if (namaLabel === 'Karanganyar') {
+                    titikTengah = L.latLng(-7.641345272310805, 111.05509192925757); // Tarik ke tengah daratan Kebumen
+                } else if (namaLabel === 'Sukoharjo') {
+                    titikTengah = L.latLng(-7.7005081345722495, 110.85132973074435); // Tarik ke tengah daratan Kebumen
+                } else if (namaLabel === 'Wonogiri') {
+                    titikTengah = L.latLng(-7.888606708394388, 110.95899471367098); // Tarik ke tengah daratan Kebumen
+                } else if (namaLabel === 'Temanggung') {
+                    titikTengah = L.latLng(-7.268477482026091, 110.11982796620144);
+                } else if (namaLabel === 'Purbalingga') {
+                    titikTengah = L.latLng(-7.318456320965718, 109.39034463116583);
+                } else if (namaLabel === 'Pekalongan') {
+                    titikTengah = L.latLng(-7.072516460550913, 109.6115277687368);
+                }
+                // C. Buat "Titik Jangkar" tak kasat mata di koordinat tersebut
+                var titikJangkar = L.circleMarker(titikTengah, {
+                    radius: 0, stroke: false, fill: false, interactive: false
+                }).addTo(map);
+
+                // D. Pasang teks label di titik jangkar tersebut
+                titikJangkar.bindTooltip(String(namaLabel), {
+                    permanent: true, 
+                    direction: 'center', 
+                    className: 'label-dinamis-kabupaten'
+                });
+            }
+
+            // ==========================================
+            // 2. BAGIAN POP-UP (Menu Lipat Saat Diklik)
+            // ==========================================
+            layer.bindPopup(function(layer) {
+                // CEK KONEKSI
+                if (!dataSheets || dataSheets.length === 0) {
+                    return '<div style="padding: 10px; color: #ef4444; font-family: sans-serif; font-size: 12px;"><b>Sedang menyedot data...</b><br>Tutup dan klik lagi dalam 2 detik. Jika terus muncul, Anda harus menjalankannya menggunakan Live Server di VS Code.</div>';
+                }
+
+                // AMBIL NAMA QGIS
+                var namaKabKlik = layer.feature.properties['Wilayah ad']; 
+                var namaBersihQGIS = namaKabKlik ? String(namaKabKlik).trim().toLowerCase() : "";
+                
+                // JURUS BYPASS KOLOM PERTAMA
+                var dataCocok = dataSheets.filter(function(baris) {
+                    var kunciKolomPertama = Object.keys(baris)[0]; 
+                    var namaSheets = baris[kunciKolomPertama];
+                    var namaBersihSheets = namaSheets ? String(namaSheets).trim().toLowerCase() : "";
+                    return namaBersihSheets === namaBersihQGIS;
+                });
+
+                // RAKIT POP-UP MENU LIPAT
+                var htmlPopUp = '<div style="height: 250px; width: 310px; min-width: 250px; min-height: 150px; max-width: 800px; max-height: 70vh; resize: both; overflow: auto; padding-right: 5px; font-family: \'Poppins\', sans-serif;">';
+                htmlPopUp += '<h3 style="margin-top:0; margin-bottom:5px; color:#2c3e50; border-bottom: 2px solid #3b82f6; padding-bottom: 5px;">' + (namaKabKlik !== null ? String(namaKabKlik) : '') + '</h3>';
+
+                if(dataCocok.length > 0) {
+                    htmlPopUp += '<p style="font-size:11px; color:#64748b; margin-bottom:10px;">Ditemukan <b>' + dataCocok.length + '</b> data. Klik pada nama untuk detail:</p>';
+
+                    dataCocok.forEach(function(baris, index) {
+                        htmlPopUp += '<details style="margin-bottom: 6px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 5px;">';
+                        
+                        var judulLipatan = baris['Nama Pemegang Hak'] || baris[Object.keys(baris)[2]] || ('Data ke-' + (index + 1));
+                        
+                        htmlPopUp += '<summary style="padding: 8px; font-size: 12px; font-weight: bold; color: #0f172a; cursor: pointer; outline: none;">';
+                        htmlPopUp += (index + 1) + '. ' + judulLipatan;
+                        htmlPopUp += '</summary>';
+                        
+                        htmlPopUp += '<div style="padding: 10px; border-top: 1px solid #cbd5e1; background: #ffffff;">';
+                        htmlPopUp += '<table style="width: 100%; font-size: 11px; border-collapse: collapse; text-align: left;">';
+                        
+                        var namaKolomPertama = Object.keys(baris)[0];
+                        
+                        for (var namaKolom in baris) {
+                            // Pastikan bukan kolom pertama dan nama kolom tidak kosong (mencegah kolom sisa Spreadsheet ikut masuk)
+                            if (namaKolom !== namaKolomPertama && namaKolom.trim() !== "") {
+                                
+                                // LOGIKA BARU: Jika sel di Spreadsheet kosong, ganti otomatis menjadi teks strip (-)
+                                var nilaiData = baris[namaKolom];
+                                if (nilaiData === "" || nilaiData === null || typeof nilaiData === "undefined") {
+                                    nilaiData = "-";
+                                }
+
+                                var isiTeks = String(nilaiData).replace(/\n/g, '<br>');
+
+                                htmlPopUp += '<tr>';
+                                htmlPopUp += '<td style="padding: 4px 0; border-bottom: 1px solid #f1f5f9; width: 40%; vertical-align: top;"><b>' + namaKolom + '</b></td>';
+                                htmlPopUp += '<td style="padding: 4px 0; border-bottom: 1px solid #f1f5f9; vertical-align: top;">' + isiTeks + '</td>';
+                                htmlPopUp += '</tr>';
+                            }
+                        }
+                        
+                        htmlPopUp += '</table></div></details>';
+                    });
+                } else {
+                    htmlPopUp += '<p style="color: #ef4444; font-size: 12px; margin-top:10px;">Belum ada data sengketa/tanah untuk wilayah ini.</p>';
+                }
+                htmlPopUp += '</div>';
+
+                return htmlPopUp;
+           }, { maxWidth: 850, minWidth: 250, closeOnClick: false });
+        }
+
+        function style_Wilayahadministrasikabupatenkota_3_0(feature) {
+            // 1. Ambil nama kabupaten/kota dari data bawaan QGIS
+            var namaKab = feature.properties['Wilayah ad'];
+            var namaBersih = namaKab ? String(namaKab).toLowerCase() : "";
+
+            // 2. Tentukan warna dasar (abu-abu) sebagai cadangan jika ada nama yang tidak terdaftar
+            var warnaPilihan = 'rgba(200,200,200,1.0)'; 
+
+            // 3. LOGIKA PENGELOMPOKAN KARESIDENAN
+            
+            // A. Karesidenan Semarang (Warna: Biru)
+            if (namaBersih.includes("semarang") || namaBersih.includes("salatiga") || 
+                namaBersih.includes("kendal") || namaBersih.includes("demak") || namaBersih.includes("grobogan")) {
+                warnaPilihan = '#3b82f6'; 
+            } 
+            // B. Karesidenan Pati (Warna: Oranye)
+            else if (namaBersih.includes("pati") || namaBersih.includes("kudus") || 
+                     namaBersih.includes("jepara") || namaBersih.includes("rembang") || namaBersih.includes("blora")) {
+                warnaPilihan = '#f97316'; 
+            }
+            // C. Karesidenan Kedu (Warna: Hijau)
+            else if (namaBersih.includes("magelang") || namaBersih.includes("temanggung") || 
+                     namaBersih.includes("wonosobo") || namaBersih.includes("purworejo") || namaBersih.includes("kebumen")) {
+                warnaPilihan = '#10b981'; 
+            }
+            // D. Karesidenan Banyumas (Warna: Ungu)
+            else if (namaBersih.includes("banyumas") || namaBersih.includes("cilacap") || 
+                     namaBersih.includes("purbalingga") || namaBersih.includes("banjarnegara")) {
+                warnaPilihan = '#8b5cf6'; 
+            }
+            // E. Karesidenan Pekalongan (Warna: Merah Muda / Rose)
+            else if (namaBersih.includes("pekalongan") || namaBersih.includes("batang") || 
+                     namaBersih.includes("pemalang") || namaBersih.includes("tegal") || namaBersih.includes("brebes")) {
+                warnaPilihan = '#f43f5e'; 
+            }
+            // F. Karesidenan Surakarta (Warna: Kuning Emas)
+            else if (namaBersih.includes("surakarta") || namaBersih.includes("sukoharjo") || 
+                     namaBersih.includes("klaten") || namaBersih.includes("boyolali") || 
+                     namaBersih.includes("karanganyar") || namaBersih.includes("sragen") || namaBersih.includes("wonogiri")) {
+                warnaPilihan = '#eab308'; 
+            }
+
+            // 4. Terapkan warna ke peta
+            return {
+                pane: 'pane_Wilayahadministrasikabupatenkota_3',
+                opacity: 1,
+                color: 'rgba(255,255,255,1.0)', // Warna garis batas (border) antar kabupaten dibuat putih agar rapi
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1, // Kecerahan warna disetel 100%
+                fillColor: warnaPilihan, // Memasukkan warna dari logika Karesidenan di atas
+                interactive: true,
+            }
+        }
+        map.createPane('pane_Wilayahadministrasikabupatenkota_3');
+        map.getPane('pane_Wilayahadministrasikabupatenkota_3').style.zIndex = 403;
+        map.getPane('pane_Wilayahadministrasikabupatenkota_3').style['mix-blend-mode'] = 'normal';
+        var layer_Wilayahadministrasikabupatenkota_3 = new L.geoJson(json_Wilayahadministrasikabupatenkota_3, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_Wilayahadministrasikabupatenkota_3',
+            layerName: 'layer_Wilayahadministrasikabupatenkota_3',
+            pane: 'pane_Wilayahadministrasikabupatenkota_3',
+            onEachFeature: pop_Wilayahadministrasikabupatenkota_3,
+            style: style_Wilayahadministrasikabupatenkota_3_0,
+        });
+        bounds_group.addLayer(layer_Wilayahadministrasikabupatenkota_3);
+        map.addLayer(layer_Wilayahadministrasikabupatenkota_3);
+        // RUMUS TEKS KETERANGAN (Silakan edit teks di bawah ini sesuka hati)
+        // RUMUS TEKS KETERANGAN (Silakan edit teks di bawah ini sesuka hati)
+        var teksLegendaKita = `
+            <b>Wilayah Administrasi Kabupaten/Kota</b>
+            <div style="padding-left: 10px; margin-top: 5px; font-size: 11px; font-weight: normal; color: #334155; line-height: 1.6; border-left: 2px solid #3b82f6;">
+                <b>Keterangan Kelas Luasan Hak Atas Tanah:</b><br>
+                A1 : &lt;25 Ha<br>
+                A2 : 25 - 100 Ha<br>
+                A3 : 100 - 500 Ha<br>
+                A4 : 500 - 1.000 Ha<br>
+                A5 : 1.000 - 3.000 Ha<br>
+                A6 : 3.000 - 6.000 Ha<br>
+                A7 : 6.000 - 10.000 Ha<br>
+                A8 : &gt;10.000 Ha
+            </div>
+            <div style="padding-left: 10px; margin-top: 5px; font-size: 11px; font-weight: normal; color: #334155; line-height: 1.6; border-left: 2px solid #3b82f6;">
+                <b>Kategori Tahapan:</b><br>
+                TO : SK Pendayagunaan TCUN<br>
+                T1 : SK Penetapan Tanah Telantar<br>
+                T2 : Dihapus/Optimalisasi Penggunaan<br>
+                T3 : Usulan Penetapan Tante (Status Quo)<br>
+                T4 : Proses Penetapan<br>
+                T5 : Belum Penertiban (Belum Berakhir Hak)<br>
+                T6 : Belum Penertiban (Sudah Berakhir Hak)<br>
+                T7 : Proses Penertiban (Sudah Berakhir Hak)
+            </div>
+        `;
+        // DAFTAR MENU LAYER
+        var overlaysTree = [
+            {label: teksLegendaKita, layer: layer_Wilayahadministrasikabupatenkota_3},
+            {label: "OSM Standard", layer: layer_OSMStandard_2},
+            {label: "Google Satellite", layer: layer_GoogleSatellite_1},
+            {label: "Google Terrain", layer: layer_GoogleTerrain_0},
+        ];
+        var lay = L.control.layers.tree(null, overlaysTree,{
+            //namedToggle: true,
+            //selectorBack: false,
+            //closedSymbol: '&#8862; &#x1f5c0;',
+            //openedSymbol: '&#8863; &#x1f5c1;',
+            //collapseAll: 'Collapse all',
+            //expandAll: 'Expand all',
+            collapsed: true,
+        });
+        lay.addTo(map);
+        setBounds();
+        // MODIFIKASI PENCARIAN DENGAN EFEK "TERBANG" (FLY-TO) & POP-UP
+        var searchControlKita = new L.Control.Search({
+            layer: layer_Wilayahadministrasikabupatenkota_3,
+            initial: false,
+            collapsed: false, 
+            hideMarkerOnCollapse: true,
+            textPlaceholder: 'Cari wilayah...', 
+            propertyName: 'Wilayah ad',
+            marker: false // Menghilangkan lingkaran merah
+        });
+
+        // Variabel untuk menyimpan layer yang sedang aktif & timer otomatisnya
+        var layerSorotSebelumnya = null;
+        var timerKembaliNormal = null;
+
+        // Aksi ketika wilayah diklik dari daftar pencarian
+        searchControlKita.on('search:locationfound', function(e) {
+            
+            // 1. Bersihkan timer dan kembalikan warna wilayah sebelumnya
+            if (timerKembaliNormal) clearTimeout(timerKembaliNormal);
+            if (layerSorotSebelumnya) {
+                layer_Wilayahadministrasikabupatenkota_3.resetStyle(layerSorotSebelumnya);
+            }
+
+            // 2. TERBANG ALAMI (Menggunakan efek kurva bawaan Leaflet)
+            map.flyToBounds(e.layer.getBounds(), {
+                padding: [50, 50], 
+                maxZoom: 12,       
+                duration: 1.5      
+            });
+            
+            // 3. MENCEGAH PETA BLANK (fillOpacity dinaikkan jadi 0.8)
+            e.layer.setStyle({
+                fillOpacity: 0.8,
+                weight: 4,
+                color: '#ffff00' // Garis tepi kuning
+            });
+
+            layerSorotSebelumnya = e.layer;
+            
+            // 4. Buka Pop-Up saat pendaratan selesai
+            if(e.layer._popup) {
+                setTimeout(function() {
+                    e.layer.openPopup();
+                }, 1500); 
+            }
+
+            // 5. Kembalikan ke warna normal setelah 5 detik
+            timerKembaliNormal = setTimeout(function() {
+                if (layerSorotSebelumnya) {
+                    layer_Wilayahadministrasikabupatenkota_3.resetStyle(layerSorotSebelumnya);
+                    layerSorotSebelumnya = null;
+                }
+            }, 5000); 
+            
+        });
+
+        // Pengaman: Jika user menutup pop-up sebelum 5 detik
+        map.on('popupclose', function() {
+            if (timerKembaliNormal) clearTimeout(timerKembaliNormal);
+            if (layerSorotSebelumnya) {
+                layer_Wilayahadministrasikabupatenkota_3.resetStyle(layerSorotSebelumnya);
+                layerSorotSebelumnya = null;
+            }
+        });
+        
+        map.addControl(searchControlKita);
+        // MANTRA OTOMATIS: MENGUBAH UKURAN HURUF SAAT ZOOM
+        map.on('zoomend', function() {
+            var zoomSekarang = map.getZoom();
+            
+            // 1. Atur Ukuran Kabupaten
+            var ukuranHurufKab = zoomSekarang * 1.3; 
+            var semuaLabelKab = document.querySelectorAll('.label-dinamis-kabupaten');
+            semuaLabelKab.forEach(function(label) {
+                label.style.fontSize = ukuranHurufKab + 'px';
+            });
+
+            // 2. Atur Ukuran Desa & Fitur Sembunyi Otomatis
+            var ukuranHurufDesa = zoomSekarang * 0.8; // Huruf desa dibuat lebih kecil dari Kabupaten
+            var semuaLabelDesa = document.querySelectorAll('.label-dinamis-desa');
+            
+            semuaLabelDesa.forEach(function(label) {
+                // KUNCI: Sembunyikan nama desa jika zoom level berada di bawah 11 (terlalu jauh)
+                if (zoomSekarang < 11) {
+                    label.style.display = 'none';
+                } else {
+                    label.style.display = 'block';
+                    label.style.fontSize = ukuranHurufDesa + 'px';
+                }
+            });
+        });
+
+        // Memicu rumus di atas sekali saat peta pertama kali dibuka
+        map.fire('zoomend');
+
+        // ==========================================
+        // SCRIPT LOGIKA TAB & PEMINDAH TOOLS QGIS
+        // ==========================================
+        
+        // 1. Fungsi Klik Ganti Tab (Dengan Fitur Buka-Tutup)
+        function bukaTab(namaTab) {
+            // Deteksi ID tombol yang diklik (misal 'tab-layer' menjadi 'btn-layer')
+            var iconId = namaTab.replace('tab-', 'btn-'); 
+            var tombolDiklik = document.getElementById(iconId);
+            var panelSidebar = document.querySelector('.sidebar-panel');
+            var btnAddLayer = document.getElementById('btn-add-layer');
+
+            // KUNCI UTAMA: Cek apakah menu yang diklik adalah menu yang sedang terbuka saat ini?
+            if (tombolDiklik.classList.contains('active')) {
+                // Jika iya, matikan lampu aktifnya dan sembunyikan panelnya!
+                tombolDiklik.classList.remove('active');
+                panelSidebar.classList.add('tersembunyi');
+                
+                // Segarkan ukuran peta Leaflet agar tidak ada ruang kosong (blank) yang tersisa
+                setTimeout(function() { map.invalidateSize(); }, 300);
+                return; // Hentikan proses sampai di sini
+            }
+
+            // Jika yang diklik adalah menu lain, atau saat panel sedang tertutup:
+            panelSidebar.classList.remove('tersembunyi'); // Pastikan panel terbuka
+
+            // Matikan semua lampu aktif di menu lain
+            document.querySelectorAll('.tab-content').forEach(function(tab) { tab.classList.remove('active'); });
+            document.querySelectorAll('.sidebar-icon').forEach(function(icon) { icon.classList.remove('active'); });
+            
+            // Nyalakan lampu aktif pada menu yang diklik
+            document.getElementById(namaTab).classList.add('active');
+            tombolDiklik.classList.add('active');
+            
+            // Ubah Judul & Munculkan tombol (+) sesuai menu
+            if(namaTab === 'tab-layer') {
+                document.getElementById('judul-panel').innerText = 'DAFTAR LAYER';
+                if(btnAddLayer) btnAddLayer.style.display = 'flex'; 
+            } else if (namaTab === 'tab-ukur') {
+                document.getElementById('judul-panel').innerText = 'ALAT UKUR';
+                if(btnAddLayer) btnAddLayer.style.display = 'none'; 
+            } else if (namaTab === 'tab-cari') {
+                document.getElementById('judul-panel').innerText = 'PENCARIAN WILAYAH';
+                if(btnAddLayer) btnAddLayer.style.display = 'none'; 
+            }
+
+            // Segarkan ukuran peta Leaflet karena ada panel yang memakan tempat
+            setTimeout(function() { map.invalidateSize(); }, 300);
+        }
+
+        // 2. Memindahkan Alat Bawaan QGIS ke Sidebar
+        setTimeout(function() {
+            var layerControl = document.querySelector('.leaflet-control-layers');
+            if(layerControl) document.getElementById('tempat-layer-qgis').appendChild(layerControl);
+
+            var measureControl = document.querySelector('.leaflet-control-measure');
+            if(measureControl) document.getElementById('tempat-ukur').appendChild(measureControl);
+
+            var searchControl = document.querySelector('.leaflet-control-search');
+            if(searchControl) document.getElementById('tempat-cari').appendChild(searchControl);
+        }, 500); 
+
+        // ==========================================
+        // 3. MESIN MODAL & CUSTOM LAYER MANAGER
+        // ==========================================
+        var modalOverlay = document.getElementById('layer-modal');
+        var btnOpenModal = document.getElementById('btn-add-layer');
+        var btnCloseModal = document.getElementById('btn-close-modal');
+        var btnApplyLayers = document.getElementById('btn-apply-layers');
+
+        // Buka tutup modal
+        if (btnOpenModal) btnOpenModal.addEventListener('click', function() { modalOverlay.style.display = 'flex'; });
+        if (btnCloseModal) btnCloseModal.addEventListener('click', function() { modalOverlay.style.display = 'none'; });
+
+        // 1. BUAT WADAH KOSONG UNTUK DESA
+        var grupLayerDesa = L.layerGroup().addTo(map);
+
+        // Database identitas masing-masing layer (Judul disatukan ke warna biru)
+        var databaseLayerKita = {
+            'chk-wilayah': { 
+                layerAsli: layer_Wilayahadministrasikabupatenkota_3, 
+                jenis: 'legenda',
+                judul: 'WILAYAH ADMINISTRASI KABUPATEN/KOTA', 
+                htmlLegenda: `
+                    <div style="font-size: 11px; color: #334155; line-height: 1.6; margin-top: 10px;">
+                        <div style="display: flex; align-items: center; margin-bottom: 6px;">
+                            <span style="width: 15px; height: 15px; background-color: #3b82f6; border: 1px solid #cbd5e1; margin-right: 8px; display: inline-block;"></span> Karesidenan Semarang
+                        </div>
+                        <div style="display: flex; align-items: center; margin-bottom: 6px;">
+                            <span style="width: 15px; height: 15px; background-color: #f97316; border: 1px solid #cbd5e1; margin-right: 8px; display: inline-block;"></span> Karesidenan Pati
+                        </div>
+                        <div style="display: flex; align-items: center; margin-bottom: 6px;">
+                            <span style="width: 15px; height: 15px; background-color: #10b981; border: 1px solid #cbd5e1; margin-right: 8px; display: inline-block;"></span> Karesidenan Kedu
+                        </div>
+                        <div style="display: flex; align-items: center; margin-bottom: 6px;">
+                            <span style="width: 15px; height: 15px; background-color: #8b5cf6; border: 1px solid #cbd5e1; margin-right: 8px; display: inline-block;"></span> Karesidenan Banyumas
+                        </div>
+                        <div style="display: flex; align-items: center; margin-bottom: 6px;">
+                            <span style="width: 15px; height: 15px; background-color: #f43f5e; border: 1px solid #cbd5e1; margin-right: 8px; display: inline-block;"></span> Karesidenan Pekalongan
+                        </div>
+                        <div style="display: flex; align-items: center; margin-bottom: 6px;">
+                            <span style="width: 15px; height: 15px; background-color: #eab308; border: 1px solid #cbd5e1; margin-right: 8px; display: inline-block;"></span> Karesidenan Surakarta
+                        </div>
+                    </div>
+                    
+                    <!-- KODE TAMBAHAN SLIDER OPASITAS -->
+                    <div style="margin-top: 15px; padding-top: 12px; border-top: 1px dashed #cbd5e1;">
+                        <label style="font-size: 11px; font-weight: bold; color: #475569; display: flex; justify-content: space-between; margin-bottom: 8px;">
+                            <span>Transparansi Warna</span>
+                            <span id="teks-opacity">100%</span>
+                        </label>
+                        <input type="range" min="0" max="1" step="0.1" value="1" style="width: 100%; accent-color: #3b82f6; cursor: pointer;" oninput="ubahOpacity(this.value)">
+                    </div>
+                `
+            },
+            
+            // 2. TAMBAHKAN KODE INI UNTUK LAYER DESA KITA
+            'chk-desa': {
+                layerAsli: grupLayerDesa,
+                jenis: 'legenda',
+                judul: 'WILAYAH ADMINISTRASI DESA/KELURAHAN',
+                htmlLegenda: `
+                    <!-- TAMBAHAN BARU: SLIDER OPASITAS KHUSUS DESA -->
+                    <div style="margin-top: 15px; padding-top: 12px; border-top: 1px dashed #cbd5e1;">
+                        <label style="font-size: 11px; font-weight: bold; color: #475569; display: flex; justify-content: space-between; margin-bottom: 8px;">
+                            <span>Transparansi Warna</span>
+                            <span id="teks-opacity-desa">80%</span>
+                        </label>
+                        <input type="range" min="0" max="1" step="0.1" value="0.8" style="width: 100%; accent-color: #ef4444; cursor: pointer;" oninput="ubahOpacityDesa(this.value)">
+                    </div>
+                `
+            },
+            
+            'chk-osm': { layerAsli: layer_OSMStandard_2, jenis: 'basemap', judul: 'OSM Standard' },
+            'chk-satelit': { layerAsli: layer_GoogleSatellite_1, jenis: 'basemap', judul: 'Google Satellite' },
+            'chk-terrain': { layerAsli: layer_GoogleTerrain_0, jenis: 'basemap', judul: 'Google Terrain' }
+        };
+        // ==========================================
+        // FUNGSI MENGATUR OPASITAS / TRANSPARANSI
+        // ==========================================
+        function ubahOpacity(nilai) {
+            // 1. Ubah teks indikator persentase (misal dari 1 menjadi 100%)
+            var persentase = Math.round(nilai * 100);
+            var teksElement = document.getElementById('teks-opacity');
+            if (teksElement) {
+                teksElement.innerText = persentase + '%';
+            }
+            
+            // 2. Suntikkan nilai transparansi (0.0 sampai 1.0) langsung ke peta
+            if (layer_Wilayahadministrasikabupatenkota_3) {
+                layer_Wilayahadministrasikabupatenkota_3.setStyle({
+                    fillOpacity: parseFloat(nilai)
+                });
+            }
+        }
+
+        // FUNGSI BARU: MENGATUR OPASITAS / TRANSPARANSI KHUSUS DESA
+        function ubahOpacityDesa(nilai) {
+            // 1. Ubah teks indikator persentase
+            var persentase = Math.round(nilai * 100);
+            var teksElement = document.getElementById('teks-opacity-desa');
+            if (teksElement) {
+                teksElement.innerText = persentase + '%';
+            }
+            
+            // 2. Terapkan transparansi ke dalam grup layer desa
+            grupLayerDesa.eachLayer(function(layerBatasDesa) {
+                if (layerBatasDesa.setStyle) {
+                    layerBatasDesa.setStyle({
+                        fillOpacity: parseFloat(nilai)
+                    });
+                }
+            });
+        }
+
+        // Fungsi mengeksekusi centang dari modal ke dalam peta
+        function eksekusiLayer() {
+            var container = document.getElementById('active-layers-container');
+            var emptyState = document.getElementById('empty-state');
+            container.innerHTML = '';
+            var jumlahAktif = 0;
+
+            for (var idCentang in databaseLayerKita) {
+                var kotakCentang = document.getElementById(idCentang);
+                var data = databaseLayerKita[idCentang];
+
+                // Inisialisasi status mata (default: menyala/true)
+                if (typeof data.tampil === 'undefined') {
+                    data.tampil = true; 
+                }
+
+                if (kotakCentang && kotakCentang.checked) {
+                    jumlahAktif++;
+
+                    // LOGIKA MATA: Tampilkan ke peta hanya jika 'data.tampil' bernilai true
+                    if (data.tampil) {
+                        if (!map.hasLayer(data.layerAsli)) { map.addLayer(data.layerAsli); }
+                    } else {
+                        if (map.hasLayer(data.layerAsli)) { map.removeLayer(data.layerAsli); }
+                    }
+
+                    // Menentukan ikon dan warna berdasarkan status mata
+                    var iconMata = data.tampil ? 'fa-eye' : 'fa-eye-slash';
+                    var warnaMata = data.tampil ? '#3b82f6' : '#94a3b8';
+
+                    // Render kotak di panel kiri dengan tombol X dan tombol Mata berdampingan
+                    if (data.jenis === 'legenda') {
+                        container.innerHTML += `
+                            <div class="layer-card">
+                                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px;">
+                                    <h3 style="font-size: 11px; color: #3b82f6; margin: 0; text-transform: uppercase;">` + data.judul + `</h3>
+                                    <div style="display: flex; gap: 12px; align-items: center;">
+                                        <i class="fas ` + iconMata + `" style="color: ` + warnaMata + `; cursor: pointer; font-size: 14px; transition: 0.2s;" onclick="toggleMata('` + idCentang + `')" title="Sembunyikan/Tampilkan Layer di Peta"></i>
+                                        <i class="fas fa-times" style="color: #ef4444; cursor: pointer; font-size: 14px; transition: 0.2s;" onclick="hapusLayerAktif('` + idCentang + `')" title="Hapus Layer dari Dasbor"></i>
+                                    </div>
+                                </div>
+                                ` + data.htmlLegenda + `
+                            </div>
+                        `;
+                    } else if (data.jenis === 'basemap') {
+                        container.innerHTML += `
+                            <div class="layer-card" style="padding: 10px 15px; border-left: 4px solid #64748b; display: flex; justify-content: space-between; align-items: center;">
+                                <h4 style="margin:0; font-size:13px; color:#334155;">
+                                    <i class="fas fa-map" style="margin-right:8px; color:#94a3b8;"></i> ` + data.judul + `
+                                </h4>
+                                <div style="display: flex; gap: 12px; align-items: center;">
+                                    <i class="fas ` + iconMata + `" style="color: ` + warnaMata + `; cursor: pointer; font-size: 14px; transition: 0.2s;" onclick="toggleMata('` + idCentang + `')" title="Sembunyikan/Tampilkan Layer di Peta"></i>
+                                    <i class="fas fa-times" style="color: #ef4444; cursor: pointer; font-size: 14px; transition: 0.2s;" onclick="hapusLayerAktif('` + idCentang + `')" title="Hapus Layer dari Dasbor"></i>
+                                </div>
+                            </div>
+                        `;
+                    }
+                } else {
+                    // Sembunyikan dari peta jika silang (X) di klik
+                    if (map.hasLayer(data.layerAsli)) { map.removeLayer(data.layerAsli); }
+                    // Reset mata agar nyala otomatis kalau suatu saat ditambahkan lagi
+                    data.tampil = true; 
+                }
+            }
+
+            // Atur teks "Belum ada layer aktif"
+            if (emptyState) emptyState.style.display = (jumlahAktif > 0) ? 'none' : 'block';
+            if (modalOverlay) modalOverlay.style.display = 'none'; // Tutup pop-up
+        }
+
+        // FUNGSI BARU: Hapus layer saat tombol X diklik
+        function hapusLayerAktif(idCentang) {
+            var kotakCentang = document.getElementById(idCentang);
+            if (kotakCentang) {
+                kotakCentang.checked = false; // Hilangkan centangnya di belakang layar
+                eksekusiLayer(); // Gambar ulang seluruh panel dan peta
+            }
+        }
+
+        // FUNGSI BARU: Sembunyikan/Tampilkan Peta Saat Ikon Mata Diklik
+        function toggleMata(idCentang) {
+            var data = databaseLayerKita[idCentang];
+            if (data) {
+                data.tampil = !data.tampil; // Membalikkan status (menyala jadi mati, mati jadi menyala)
+                eksekusiLayer(); // Render ulang panel dan peta
+            }
+        }
+
+        // Picu tombol simpan di modal
+        if (btnApplyLayers) btnApplyLayers.addEventListener('click', eksekusiLayer);
+
+        // Jalankan perintah satu kali saat web pertama dibuka agar sinkron
+        setTimeout(eksekusiLayer, 100);
+
+        // ==========================================================
+        // MANTRA MENGGABUNGKAN HOME & MATA ANGIN KE BARISAN TOOLS KANAN
+        // ==========================================================
+        var wadahKananAtas = document.querySelector('.leaflet-top.leaflet-right');
+        var btnHome = document.getElementById('btn-home');
+        var wadahMataAngin = document.getElementById('wadah-mata-angin');
+        
+        if (wadahKananAtas) {
+            // Pasang Tombol Home ke Kontrol Kanan Atas
+            if (btnHome) {
+                btnHome.classList.add('leaflet-control');
+                wadahKananAtas.appendChild(btnHome);
+                
+                // Beri Fungsi Klik pada Tombol Home sesuai koordinat peta ini
+                btnHome.addEventListener('click', function() {
+                    map.fitBounds([[-8.48349739740613,108.07859867895174],[-5.872741136706118,111.74958179993602]]);
+                });
+            }
+            
+            // Pasang Kotak Putih Mata Angin ke Kontrol Kanan Atas
+            if (wadahMataAngin) {
+                wadahMataAngin.classList.add('leaflet-control');
+                wadahKananAtas.appendChild(wadahMataAngin);
+            }
+        }
+        
+   // ==========================================
+// FITUR UNGGAH & HAPUS SHP (.ZIP) TERINTEGRASI KE PANEL LAYER
+// ==========================================
+
+// 0. Buat wadah khusus (Grup Layer) agar SHP mudah dikelola
+var grupLayerShp = L.featureGroup().addTo(map);
+
+// Objek untuk menyimpan referensi setiap layer SHP yang diunggah
+var daftarLayerUnggahan = {}; 
+var idCounterSHP = 1; // Untuk memberikan ID unik pada setiap file SHP
+
+// 1. Trik untuk memicu input file sekaligus merubah warna saat Upload
+document.getElementById('btn-upload-shp').addEventListener('click', function() {
+    var tombolKita = this;
+    tombolKita.classList.add('active');
+    document.getElementById('input-shp-zip').click();
+    
+    setTimeout(function() {
+        tombolKita.classList.remove('active');
+    }, 2000);
+});
+
+// 2. Tombol Hapus Semua (Tong Sampah) - Tetap Dipertahankan
+document.getElementById('btn-delete-shp').addEventListener('click', function() {
+    grupLayerShp.clearLayers(); 
+    daftarLayerUnggahan = {}; // Kosongkan database internal
+    perbaruiPanelLayerSHP(); // Segarkan tampilan panel
+    
+    var tombolHapus = this;
+    tombolHapus.classList.add('active');
+    setTimeout(function() { tombolHapus.classList.remove('active'); }, 300);
+});
+
+// 3. Logika Upload & Render SHP
+document.getElementById('input-shp-zip').addEventListener('change', function(e) {
+    var files = e.target.files;
+    if (files.length === 0) return;
+
+    for (var i = 0; i < files.length; i++) {
+        var file = files[i];
+        var reader = new FileReader();
+        
+        (function(fileSaatIni) {
+            reader.onload = function(event) {
+                var buffer = event.target.result;
+                
+                shp(buffer).then(function(geojson) {
+                    
+                    var layerBaru = L.geoJson(geojson, {
+                        style: function(feature) {
+                            return { color: "#3b82f6", weight: 2, fillOpacity: 0.4 };
+                        },
+                        onEachFeature: function(feature, layer) {
+                            if (feature.properties) {
+                                var htmlPopup = '<div style="font-family: Poppins, sans-serif; font-size: 11px; max-height: 200px; overflow: auto;">';
+                                htmlPopup += '<h4 style="margin:0 0 5px 0; border-bottom:1px solid #ccc; padding-bottom:3px;">Informasi Atribut SHP</h4>';
+                                htmlPopup += '<table style="width:100%; border-collapse: collapse;">';
+                                
+                                for (var key in feature.properties) {
+                                    htmlPopup += '<tr><td style="padding: 2px 4px; border: 1px solid #eee;"><b>' + key + '</b></td>';
+                                    htmlPopup += '<td style="padding: 2px 4px; border: 1px solid #eee;">' + feature.properties[key] + '</td></tr>';
+                                }
+                                htmlPopup += '</table></div>';
+                                layer.bindPopup(htmlPopup);
+                            }
+                        }
+                    });
+
+                    // Masukkan ke grup
+                    layerBaru.addTo(grupLayerShp); 
+
+                    // Simpan ke database internal kita
+                    var namaUnik = 'shp_' + idCounterSHP;
+                    daftarLayerUnggahan[namaUnik] = {
+                        layer: layerBaru,
+                        namaFile: fileSaatIni.name.replace('.zip', '') // Hapus ekstensi .zip untuk nama layer
+                    };
+                    idCounterSHP++;
+
+                    // Terbang ke lokasi data
+                    map.flyToBounds(layerBaru.getBounds(), { duration: 1.5 });
+                    
+                    // Segarkan Panel Layer (Penting!)
+                    perbaruiPanelLayerSHP();
+
+                    // Otomatis buka tab "Daftar Layer" agar pengguna melihat file barunya
+                    var tabLayer = document.getElementById('tab-layer');
+                    var btnTabLayer = document.getElementById('btn-layer');
+                    if (tabLayer && !tabLayer.classList.contains('active')) {
+                        document.querySelectorAll('.tab-content').forEach(function(t) { t.classList.remove('active'); });
+                        document.querySelectorAll('.sidebar-icon').forEach(function(i) { i.classList.remove('active'); });
+                        tabLayer.classList.add('active');
+                        if(btnTabLayer) btnTabLayer.classList.add('active');
+                        document.getElementById('judul-panel').innerText = 'DAFTAR LAYER';
+                        document.querySelector('.sidebar-panel').classList.remove('tersembunyi');
+                    }
+
+                }).catch(function(err) {
+                    alert("Gagal membaca file: " + fileSaatIni.name + ". Pastikan format isi ZIP benar.");
+                    console.error(err);
+                });
+            };
+            reader.readAsArrayBuffer(fileSaatIni);
+        })(file);
+    }
+    this.value = '';
+});
+
+// ==========================================
+// 4. FUNGSI UNTUK MERENDER PANEL SHP DI DAFTAR LAYER
+// ==========================================
+function perbaruiPanelLayerSHP() {
+    var tabLayer = document.getElementById('tab-layer');
+    if (!tabLayer) return;
+
+    // Cari wadah untuk kartu SHP, jika belum ada, buat langsung di bawah layer bawaan
+    var wadahSHP = document.getElementById('wadah-kartu-shp');
+    if (!wadahSHP) {
+        var wadahLayerAktif = document.getElementById('active-layers-container');
+        wadahSHP = document.createElement('div');
+        wadahSHP.id = 'wadah-kartu-shp';
+        wadahSHP.style.marginTop = "10px";
+        wadahLayerAktif.insertAdjacentElement('afterend', wadahSHP);
+    }
+
+    // Bersihkan isi wadah sebelum diisi ulang
+    wadahSHP.innerHTML = '';
+    var jumlahSHP = 0;
+
+    // Lakukan perulangan untuk setiap SHP yang ada di memori
+    for (var idUnik in daftarLayerUnggahan) {
+        jumlahSHP++;
+        var dataSHP = daftarLayerUnggahan[idUnik];
+        
+        // Buat kartu HTML 
+        var htmlKartu = `
+            <div class="layer-card" style="padding: 10px 15px; border-left: 4px solid #3b82f6; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h4 style="margin:0; font-size:12px; color:#334155; display:flex; align-items:center; width: 70%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="` + dataSHP.namaFile + `">
+                    <i class="fas fa-draw-polygon" style="margin-right:8px; color:#3b82f6;"></i> ` + dataSHP.namaFile + `
+                </h4>
+                <div>
+                    <!-- Tombol Zoom to Layer (Kaca Pembesar) -->
+                    <i class="fas fa-search-location" style="color: #64748b; cursor: pointer; font-size: 14px; margin-right: 12px; transition: 0.2s;" onmouseover="this.style.color='#3b82f6'" onmouseout="this.style.color='#64748b'" onclick="terbangKeSHP('` + idUnik + `')" title="Zoom ke Layer ini"></i>
+                    
+                    <!-- Tombol Hapus Layer Individual (Silang) -->
+                    <i class="fas fa-times" style="color: #ef4444; cursor: pointer; font-size: 15px; transition: 0.2s;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#ef4444'" onclick="hapusSHPIndividual('` + idUnik + `')" title="Hapus Layer ini"></i>
+                </div>
+            </div>
+        `;
+        wadahSHP.innerHTML += htmlKartu;
+    }
+    
+    // Perbarui status tulisan abu-abu "BELUM ADA LAYER AKTIF"
+    var emptyState = document.getElementById('empty-state');
+    if (emptyState) {
+        var wadahLayerBiasa = document.getElementById('active-layers-container');
+        var adaLayerBiasa = wadahLayerBiasa && wadahLayerBiasa.innerHTML.trim() !== '';
+        
+        if (adaLayerBiasa || jumlahSHP > 0) {
+            emptyState.style.display = 'none';
+        } else {
+            emptyState.style.display = 'block';
+        }
+    }
+}
+// 5. Fungsi Global untuk dieksekusi dari HTML (onclick)
+window.terbangKeSHP = function(idUnik) {
+    var dataSHP = daftarLayerUnggahan[idUnik];
+    if (dataSHP && dataSHP.layer) {
+        map.flyToBounds(dataSHP.layer.getBounds(), { duration: 1.5 });
+    }
+};
+
+window.hapusSHPIndividual = function(idUnik) {
+    var dataSHP = daftarLayerUnggahan[idUnik];
+    if (dataSHP && dataSHP.layer) {
+        // Hapus layernya dari peta
+        grupLayerShp.removeLayer(dataSHP.layer);
+        // Hapus dari memori database
+        delete daftarLayerUnggahan[idUnik];
+        // Segarkan panel agar kartunya hilang
+        perbaruiPanelLayerSHP();
+    }
+};
+        </script>       
+    </body>
+</html>
